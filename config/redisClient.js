@@ -11,4 +11,4 @@ client.connect().then(() => {
    console.log("Connected to Redis");
 });
 
-export default client;
+export { client as redisClient };

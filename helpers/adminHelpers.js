@@ -1,13 +1,18 @@
 import collections from "../config/collections.js";
 import { getDB } from "../config/connection.js";
+import { redisClient } from "../config/redisClient.js";
 import { objId } from "./mongoHelpers.js";
+import key from "../config/key.js";
 
 export async function getAllUsers({ currentUserId }) {
    const db = getDB();
 
    return await db
       .collection(collections.ACCOUNTS)
-      .find({ _id: { $ne: objId(currentUserId) } }, { projection: { password: 0 } })
+      .find(
+         { _id: { $ne: objId(currentUserId) } },
+         { projection: { password: 0 } }
+      )
       .toArray({});
 }
 
@@ -17,28 +22,18 @@ export async function getUserById(id) {
    return await db.collection(collections.ACCOUNTS).findOne({ _id: objId(id) });
 }
 
-export function destroySessions(sessionIds = []) {
-   if (!sessionIds.length) return;
-   const db = getDB();
-   db.collection(collections.SESSION).deleteMany({ _id: { $in: sessionIds } });
-}
-
 export async function deleteUserById(id) {
    const db = getDB();
 
    try {
-      const user = await db
+      await db
          .collection(collections.ACCOUNTS)
          .findOneAndDelete(
             { _id: objId(id) },
             { projection: { sessionId: 1 } }
          );
-      if (
-         user?.sessionId &&
-         Array.isArray(user.sessionId) &&
-         user.sessionId.length
-      )
-         destroySessions(user.sessionId);
+
+      redisClient.del(`${key.REFRESH_TOKEN}:${id}`);
    } catch (error) {
       throw error;
    }

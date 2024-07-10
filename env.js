@@ -12,8 +12,10 @@ export const $env = cleanEnv(process.env, {
    ACCESS_TOKEN_SECRET: str(),
    REFRESH_TOKEN_SECRET: str(),
    REFRESH_TOKEN_EXP: num({ default: 30 }),
-   ACCESS_TOKEN_EXP: str({default: '15m'}),
+   ACCESS_TOKEN_EXP: str({ default: "15m" }),
    REDIS_URL: url(),
+   BASE_URL: url(),
+   CLIENT_LOGIN_URL: url(),
 });
 
 $env.isProduction; // true if NODE_ENV === 'production'

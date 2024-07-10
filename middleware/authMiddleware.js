@@ -23,7 +23,7 @@ passport.use(
    "admin",
    new BearerStrategy((token, done) => {
       try {
-         const decodedToken = jwt.verify(token, accessTokenPrivateKey, {
+         const decodedToken = jwt.verify(token, $env.ACCESS_TOKEN_SECRET, {
             ignoreExpiration: true,
          });
 

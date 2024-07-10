@@ -15,6 +15,8 @@ import {
    verifyRefreshToken,
 } from "../helpers/tokenHelpers.js";
 import key from "../config/key.js";
+import { $env } from "../env.js";
+import jwt from "jsonwebtoken";
 
 const router = express.Router();
 
@@ -113,6 +115,14 @@ router.post("/login", async (req, res) => {
          code: "UnknownUser",
       });
 
+   if (!user?.password) {
+      return res.status(401).json({
+         msg: "User not registered with password!",
+         error: true,
+         code: "NoPasswordUser",
+      });
+   }
+
    const isMatch = comparePassword({ password, hash: user.password });
 
    if (!isMatch)
@@ -122,9 +132,11 @@ router.post("/login", async (req, res) => {
          code: "InvalidCredential",
       });
 
+   delete user.password;
+
    const accessToken = createAccessToken({ userData: user });
 
-   const refreshToken = createRefreshToken({ userData });
+   const refreshToken = createRefreshToken({ userData: user });
 
    res.cookie(`${key.REFRESH_TOKEN}`, refreshToken, {
       httpOnly: true,
@@ -133,21 +145,19 @@ router.post("/login", async (req, res) => {
       sameSite: "strict",
    });
 
-   res.status(200).send({ accessToken });
+   res.status(200).send({ accessToken, user });
 });
 
-router.post("/sign-in/google", async (req, res) => {
+router.post("/google/one-tap", async (req, res) => {
    const { credential } = req.body;
 
-   const { CLIENT_ID } = process.env;
-
-   const client = new OAuth2Client(CLIENT_ID);
+   const client = new OAuth2Client($env.CLIENT_ID);
 
    try {
       // Verify the ID token using the OAuth2Client
       const ticket = await client.verifyIdToken({
          idToken: credential,
-         audience: CLIENT_ID,
+         audience: $env.CLIENT_ID,
       });
 
       const payload = ticket.getPayload();
@@ -184,6 +194,64 @@ router.post("/sign-in/google", async (req, res) => {
       res.status(400).json({ message: "Sign-in Failed" });
       console.error("Error verifying token:", error);
    }
+});
+
+router.post("/google", (req, res) => {
+   console.log(req.body);
+   const { code } = req.body;
+   const grant_type = "authorization_code";
+
+   fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: {
+         "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+         code,
+         client_id: $env.CLIENT_ID,
+         client_secret: $env.CLIENT_SECRET,
+         redirect_uri: "postmessage",
+         grant_type,
+      }),
+   })
+      .then((response) => response.json())
+      .then(async (tokens) => {
+         const payload = jwt.decode(tokens.id_token);
+
+         const extractedUser = {
+            email: payload.email,
+            name: {
+               firstName: payload.given_name,
+               lastName: payload.family_name,
+            },
+            avatar: payload.picture,
+         };
+
+         const userData = await createOrUpsertUserGoogle(extractedUser);
+
+         const accessToken = createAccessToken({ userData });
+
+         const refreshToken = createRefreshToken({ userData });
+
+         res.cookie(`${key.REFRESH_TOKEN}`, refreshToken, {
+            httpOnly: true,
+            secure: true,
+            expires: getRefreshTokenExp(),
+            sameSite: "strict",
+         });
+
+         res.status(201).json({
+            error: false,
+            msg: "User created successfully!",
+            accessToken,
+            user: userData,
+         });
+      })
+      .catch((error) => {
+         // Handle errors in the token exchange
+         console.error("Token exchange error:", error);
+         res.status(500).json({ error: "Internal Server Error" });
+      });
 });
 
 router.post("/refresh", async (req, res) => {
@@ -223,7 +291,7 @@ router.post("/refresh", async (req, res) => {
 });
 
 router.post("/logout", (req, res) => {
-   res.clearCookie(key.REFRESH_TOKEN)
+   res.clearCookie(key.REFRESH_TOKEN);
    res.json({ msg: "Logged out!" });
 });
 

@@ -12,7 +12,7 @@ const router = express.Router();
 
 router.get("/user", async (req, res) => {
    try {
-      const users = await getAllUsers({ currentUserId: req.session.user._id });
+      const users = await getAllUsers({ currentUserId: req.user._id });
       res.json({ users, error: false });
    } catch (error) {
       res.status(500).json({
@@ -107,10 +107,10 @@ router.delete("/user/:id", async (req, res) => {
 
 router.put("/profile", async (req, res) => {
    const profile = req.body;
-   const user = req.session.user;
+   const user = req.user;
    try {
       const updatedUser = await updateProfile({ profile, _id: user._id });
-      req.session.user = updatedUser;
+      req.user = updatedUser;
       res.json({
          error: false,
          msg: "Profile updated successfully",

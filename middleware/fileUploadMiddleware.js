@@ -13,7 +13,7 @@ const storage = multer.diskStorage({
    },
    filename: (req, file, cb) => {
       const fileFormat = String(file.originalname).split(".").at(-1);
-      cb(null, `${req.user._id}.${fileFormat}`);
+      cb(null, `${Date.now()}`);
    },
 });
 

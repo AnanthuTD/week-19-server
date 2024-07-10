@@ -5,7 +5,6 @@ export const $env = cleanEnv(process.env, {
    PORT: port(),
    NODE_ENV: str({ choices: ["development", "test", "production", "staging"] }),
    DB_URI: str(),
-   SESSION_SECRET_KEY: str(),
    DB_NAME: str(),
    CLIENT_SECRET: str(),
    CLIENT_ID: str(),
@@ -15,7 +14,6 @@ export const $env = cleanEnv(process.env, {
    ACCESS_TOKEN_EXP: str({ default: "15m" }),
    REDIS_URL: url(),
    BASE_URL: url(),
-   CLIENT_LOGIN_URL: url(),
 });
 
 $env.isProduction; // true if NODE_ENV === 'production'

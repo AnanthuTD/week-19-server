@@ -1,16 +1,13 @@
 import passport from "passport";
 import { Strategy as BearerStrategy } from "passport-http-bearer";
 import jwt from "jsonwebtoken";
-import env from "../env.js";
-
-const config = env();
-const accessTokenPrivateKey = config.ACCESS_TOKEN_PRIVATE_KEY;
+import { $env } from "../env.js";
 
 passport.use(
    "user",
    new BearerStrategy((token, done) => {
       try {
-         const decodedToken = jwt.verify(token, accessTokenPrivateKey, {
+         const decodedToken = jwt.verify(token, $env.ACCESS_TOKEN_SECRET, {
             ignoreExpiration: true,
          });
 

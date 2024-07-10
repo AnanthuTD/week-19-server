@@ -1,4 +1,6 @@
-import app from "./app";
+import app from "./app.js";
+import { connectToMongoDB } from "./config/connection.js";
+import { $env } from "./env.js";
 
 const startServer = async () => {
    // connecting to mongoDB server

@@ -13,17 +13,24 @@ export function comparePassword({ password, hash }) {
 
 export async function createOrUpsertUserGoogle(user) {
    const db = getDB();
-   return await db
+
+   const existingUser = await db
       .collection(collections.ACCOUNTS)
-      .findOneAndUpdate(
-         { email: user.email },
-         { $set: user },
-         {
-            upsert: true,
-            returnDocument: "after",
-            projection: { password: 0, sessionId: 0 },
-         }
-      );
+      .findOne({ email: user.email });
+
+   if (existingUser && existingUser.avatar) {
+      delete user.avatar;
+   }
+
+   return await db.collection(collections.ACCOUNTS).findOneAndUpdate(
+      { email: user.email },
+      { $set: user },
+      {
+         upsert: true,
+         returnDocument: "after",
+         projection: { password: 0 },
+      }
+   );
 }
 
 export async function linkSessionAndUser({ sessionId, accountId }) {

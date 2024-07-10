@@ -4,7 +4,6 @@ import {
    comparePassword,
    createOrUpsertUserGoogle,
    hashPassword,
-   linkSessionAndUser,
    validateEmail,
    validatePassword,
 } from "../helpers/authHelpers.js";
@@ -12,15 +11,12 @@ import { OAuth2Client } from "google-auth-library";
 import {
    createAccessToken,
    createRefreshToken,
+   getRefreshTokenExp,
    verifyRefreshToken,
-} from "../helpers/token.js";
-import { $env } from "../env.js";
-const router = express.Router();
+} from "../helpers/tokenHelpers.js";
+import key from "../config/key.js";
 
-router.get("/", (req, res) => {
-   const { user } = req.session;
-   return res.status(201).json({ user });
-});
+const router = express.Router();
 
 router.post("/sign-up", async (req, res) => {
    try {
@@ -130,15 +126,10 @@ router.post("/login", async (req, res) => {
 
    const refreshToken = createRefreshToken({ userData });
 
-   const expiryInSec = 60 * 60 * 24 * $env.REFRESH_TOKEN_EXP;
-
-   const currentDate = new Date();
-   const expirationDate = new Date(currentDate.getTime() + expiryInSec * 1000);
-
    res.cookie(`${key.REFRESH_TOKEN}`, refreshToken, {
       httpOnly: true,
       secure: true,
-      expires: expirationDate,
+      expires: getRefreshTokenExp(),
       sameSite: "strict",
    });
 
@@ -147,7 +138,6 @@ router.post("/login", async (req, res) => {
 
 router.post("/sign-in/google", async (req, res) => {
    const { credential } = req.body;
-   const idToken = credential;
 
    const { CLIENT_ID } = process.env;
 
@@ -156,7 +146,7 @@ router.post("/sign-in/google", async (req, res) => {
    try {
       // Verify the ID token using the OAuth2Client
       const ticket = await client.verifyIdToken({
-         idToken,
+         idToken: credential,
          audience: CLIENT_ID,
       });
 
@@ -168,32 +158,27 @@ router.post("/sign-in/google", async (req, res) => {
             firstName: payload.given_name,
             lastName: payload.family_name,
          },
+         avatar: payload.picture,
       };
 
       const userData = await createOrUpsertUserGoogle(extractedUser);
 
       const accessToken = createAccessToken({ userData });
 
-      const refreshToken = await createRefreshToken({ userData });
-
-      const expiryInSec = 60 * 60 * 24 * $env.REFRESH_TOKEN_EXP;
-
-      const currentDate = new Date();
-      const expirationDate = new Date(
-         currentDate.getTime() + expiryInSec * 1000
-      );
+      const refreshToken = createRefreshToken({ userData });
 
       res.cookie(`${key.REFRESH_TOKEN}`, refreshToken, {
          httpOnly: true,
          secure: true,
-         expires: expirationDate,
+         expires: getRefreshTokenExp(),
          sameSite: "strict",
       });
 
       res.status(201).json({
          error: false,
          msg: "User created successfully!",
-         user,
+         accessToken,
+         user: userData,
       });
    } catch (error) {
       res.status(400).json({ message: "Sign-in Failed" });
@@ -202,7 +187,7 @@ router.post("/sign-in/google", async (req, res) => {
 });
 
 router.post("/refresh", async (req, res) => {
-   const { refreshToken } = req.cookies;
+   const { refreshToken } = req.cookies || undefined;
    if (!refreshToken) {
       return res.sendStatus(403); // Forbidden if no refresh token is provided
    }
@@ -216,40 +201,29 @@ router.post("/refresh", async (req, res) => {
          return res.status(401).json({ error: message }); // Unauthorized if token is invalid
       }
 
-      const payload = {
-         id: tokenDetails.id,
-         role: tokenDetails.role,
-      };
-
       // Generate a new refresh token
-      const newRefreshToken = createRefreshToken(payload);
+      const newRefreshToken = createRefreshToken({ userData: tokenDetails });
 
       // Generate a new access token
-      const newAccessToken = jwt.sign(
-         payload,
-         process.env.ACCESS_TOKEN_PRIVATE_KEY,
-         {
-            expiresIn: $env.ACCESS_TOKEN_EXP,
-         }
-      );
+      const newAccessToken = createAccessToken({ userData: tokenDetails });
 
-      // Set the new refresh token in the cookies
-      res.cookie("refreshToken", newRefreshToken, {
+      res.cookie(`${key.REFRESH_TOKEN}`, newRefreshToken, {
          httpOnly: true,
          secure: true,
-         sameSite: "Strict",
+         expires: getRefreshTokenExp(),
+         sameSite: "strict",
       });
 
       // Respond with the new access token
       return res.json({ accessToken: newAccessToken });
    } catch (error) {
-      logger.error("Internal server error:", error);
+      console.error("Internal server error:", error);
       return res.status(500).json({ error: "Internal server error" });
    }
 });
 
 router.post("/logout", (req, res) => {
-   req.session.destroy();
+   res.clearCookie(key.REFRESH_TOKEN)
    res.json({ msg: "Logged out!" });
 });
 

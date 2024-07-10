@@ -1,4 +1,5 @@
 import { MongoClient } from "mongodb";
+import { $env } from "../env.js";
 
 const status = {
    db: null,
@@ -8,8 +9,8 @@ let connectionCount = 0;
 const maxRetries = 3;
 
 export async function connectToMongoDB() {
-   const URI = process.env.DB_URI;
-   const DBNAME = process.env.DB_NAME;
+   const URI = $env.DB_URI;
+   const DBNAME = $env.DB_NAME;
 
    while (connectionCount < maxRetries) {
       try {

@@ -191,7 +191,7 @@ router.post("/google/one-tap", async (req, res) => {
          user: userData,
       });
    } catch (error) {
-      res.status(400).json({ message: "Sign-in Failed" });
+      res.status(400).json({ msg: "Sign-in Failed", code: '', error: error.message});
       console.error("Error verifying token:", error);
    }
 });
